@@ -1,0 +1,14 @@
+{
+  "name": "stripe-fee-calculator",
+  "version": "1.0.0",
+  "description": "Dependency-free Stripe fee math on standard US pricing: per-payment fee, gross-up, yearly fees, ACH.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": "./src/index.js",
+  "files": ["src"],
+  "scripts": { "test": "node --test" },
+  "keywords": ["stripe", "stripe-fees", "fee-calculator", "payments", "gross-up", "credit-card-fees"],
+  "homepage": "https://71p.com/stripe-fee-calculator",
+  "license": "MIT",
+  "author": "71P (https://71p.com)"
+}

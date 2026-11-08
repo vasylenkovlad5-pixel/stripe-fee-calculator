@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stripe fee calculator</title>
+  <meta name="description" content="Open-source Stripe fee calculator: the fee on one payment, what to charge to receive a set amount, and yearly fees on your volume. Standard US pricing.">
+  <link rel="canonical" href="https://71p.com/stripe-fee-calculator">
+  <style>
+    :root { --black: #000; --white: #fff; --pink: #FF3D8B; --pink-deep: #E0206F; --grey: #5F5F5A; --ground: var(--white); --ink: var(--black); --muted: var(--grey); }
+    @media (prefers-color-scheme: dark) { :root { --ground: #0d0d0d; --ink: #f2f2f2; --muted: #b5b5ad; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; }
+    h1 { font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1; margin: 0 0 12px; text-transform: uppercase; letter-spacing: -0.01em; font-weight: 900; }
+    h2 { font-size: 1.25rem; margin: 0 0 12px; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+    section { border: 2px solid var(--ink); padding: 20px; margin: 0 0 20px; }
+    label { display: block; font-weight: 600; margin: 0 0 4px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+    input, select { width: 100%; font: inherit; padding: 10px; border: 2px solid var(--ink); background: var(--ground); color: var(--ink); border-radius: 0; }
+    .out { margin: 8px 0 0; font-size: 1.05rem; }
+    .out strong { font-size: 1.5rem; display: block; }
+    .cta { background: var(--pink); color: #000; border-color: var(--pink); }
+    .cta p { margin: 0 0 12px; }
+    .cta a.btn { display: inline-block; background: #000; color: #fff; text-decoration: none; font-weight: 700; padding: 12px 18px; }
+    .cta a.btn:hover { background: #222; }
+    footer { color: var(--muted); font-size: 0.9rem; }
+    footer a, .lede a { color: inherit; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Stripe fee calculator</h1>
+  <p class="lede">Open-source, on Stripe's standard US pricing (2.9% + 30¢ per card payment). Fees last checked <span id="verified"></span>. Code on <a href="https://github.com/vasylenkovlad5-pixel/stripe-fee-calculator">GitHub</a>.</p>
+
+  <section aria-labelledby="h-one">
+    <h2 id="h-one">Fee on one payment</h2>
+    <div class="row">
+      <div><label for="amt">Payment amount ($)</label><input id="amt" inputmode="decimal" value="100"></div>
+      <div><label for="kind">Card</label>
+        <select id="kind">
+          <option value="domestic">US card, online</option>
+          <option value="international">International card (+1.5%)</option>
+          <option value="international-fx">International + currency conversion (+2.5%)</option>
+          <option value="manual">Manually entered (3.4% + 30¢)</option>
+        </select></div>
+    </div>
+    <p class="out" id="out-one" aria-live="polite"></p>
+  </section>
+
+  <section aria-labelledby="h-gross">
+    <h2 id="h-gross">What to charge to receive a set amount</h2>
+    <div class="row">
+      <div><label for="net">You want to receive ($)</label><input id="net" inputmode="decimal" value="100"></div>
+      <div></div>
+    </div>
+    <p class="out" id="out-gross" aria-live="polite"></p>
+  </section>
+
+  <section aria-labelledby="h-year">
+    <h2 id="h-year">Yearly Stripe fees on your volume</h2>
+    <div class="row">
+      <div><label for="vol">Card volume per year ($)</label><input id="vol" inputmode="decimal" value="10M"></div>
+      <div><label for="ticket">Average payment ($)</label><input id="ticket" inputmode="decimal" value="100"></div>
+    </div>
+    <div class="row">
+      <div><label for="intl">International cards (%)</label><input id="intl" inputmode="decimal" value="0"></div>
+      <div><label for="fx">Needs currency conversion (%)</label><input id="fx" inputmode="decimal" value="0"></div>
+    </div>
+    <p class="out" id="out-year" aria-live="polite"></p>
+  </section>
+
+  <section class="cta">
+    <p><strong>Processing $10M+ a year?</strong> The flat rate is rarely the cheapest option at that volume. The full calculator on 71P compares your Stripe fees with interchange-plus pricing for your industry and card mix.</p>
+    <a class="btn" href="https://71p.com/stripe-fee-calculator">See what you could save →</a>
+  </section>
+
+  <footer>
+    <p>Estimates on Stripe's published US pricing. Your actual fees depend on your contract, card mix and add-ons. Every Stripe fee, explained with examples: <a href="https://71p.com/stripe-fees">Stripe fees explained</a>.</p>
+    <p>MIT licensed. Maintained by <a href="https://71p.com">71P</a>.</p>
+  </footer>
+</main>
+<script type="module">
+  import { STRIPE_FEES, parseAmount, chargeFee, grossUp, annualFees, usd, pct } from "./src/index.js";
+  const $ = (id) => document.getElementById(id);
+  $("verified").textContent = new Date(STRIPE_FEES.lastVerified + "T00:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const bad = "Enter a number, for example 100 or 25M.";
+
+  function one() {
+    const a = parseAmount($("amt").value);
+    if (!(a > 0)) return ($("out-one").textContent = bad);
+    const r = chargeFee(a, $("kind").value);
+    $("out-one").innerHTML = `<strong>${usd(r.fee, 2)} fee</strong>You receive ${usd(r.net, 2)}. The fee is ${pct(r.share)} of the payment.`;
+  }
+  function gross() {
+    const n = parseAmount($("net").value);
+    if (!(n > 0)) return ($("out-gross").textContent = bad);
+    const r = grossUp(n, $("kind").value);
+    $("out-gross").innerHTML = `<strong>Charge ${usd(r.charge, 2)}</strong>Stripe keeps ${usd(r.fee, 2)} and you receive ${usd(n, 2)} (card type from the first box).`;
+  }
+  function year() {
+    const v = parseAmount($("vol").value), t = parseAmount($("ticket").value);
+    const intl = parseAmount($("intl").value) || 0, fx = parseAmount($("fx").value) || 0;
+    if (!(v > 0) || !(t > 0)) return ($("out-year").textContent = bad);
+    if (intl > 100 || fx > 100) return ($("out-year").textContent = "Enter a percentage between 0 and 100.");
+    const r = annualFees(v, { avgTicket: t, intlSharePct: intl, fxSharePct: fx });
+    $("out-year").innerHTML = `<strong>${usd(r.total)} a year</strong>An effective rate of ${pct(r.effectiveRate)} on ${usd(v)}, across about ${Math.round(r.txCount).toLocaleString("en-US")} payments.`;
+  }
+  const all = () => { one(); gross(); year(); };
+  document.querySelectorAll("input, select").forEach((el) => el.addEventListener("input", all));
+  all();
+</script>
+</body>
+</html>
